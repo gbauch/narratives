@@ -8,8 +8,9 @@
 #an element m of M is a tuple (n0,n1) counting the numbers of 0s and 1s deemed relevant
 
 reset()
-load("aux.sage") #auxiliary functions
+load("auxiliary.sage") #auxiliary functions
 load("functions.sage") #functions in the context of the example
+load("bmax.sage") #functions in the context of the upper info threshold
 
 
 def MEUeq (h,b,Mtype):					#working example: MEUeq ([1,0,1],1/10,'all')  
