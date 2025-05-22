@@ -11,16 +11,18 @@ P = [1/len(Omega) for x in Omega]
 #number of balls drawn
 K = 3
 
-#set of histories (simplified for sufficient statistic), indicating the number of red balls observed
-H = [0,..,K]
+#set of histories (full description; 1 for red, 0 for black)
+H = [[a,b,c] for a in [0,1] for b in [0,1] for c in [0,1]]
 
-#set of models (given h in H)
+#set of models (given h in H): set of indices for the relevant balls
 def M(h):
    if not (h in H):
       raise Exception('not a valid history given')
    Mlis = []
-   for ipos in range(h+1):
-      for ineg in range(K-h+1):
+   hpos = sum(h)
+   
+   for ipos in range(hpos+1):
+      for ineg in range(K-hpos+1):
          Mlis.append((ipos,ineg))
    return(Mlis)
 
@@ -97,7 +99,9 @@ def expectednumber (m):
    return(realnumber) #that's the belief
 
 
-def likelihood(m,h): #is this correct?
+def likelihood(m,h):
+   if m not in M(h):
+      raise Exception('m='+str(m)+' given does not seem to be compatible with the observed data h='+str(h))
    s = m[0]+m[1]
    if K < s:
       raise Exception('narrative is longer than history')
@@ -159,6 +163,90 @@ def monotonepartition (A):
 
 def orderM(Mlis):
    return(sorted(Mlis,key = lambda m: payoffmaximizer(m)))
+
+
+#determines the corresponding reduced equilibrium
+def reduceeq(eq):
+   sigma=eq[0]
+   rho = eq[1]
+   retsigma = []
+   retrho = []
+   iSet = list(range(len(rho)))
+   while len(iSet)!=0:
+      i = iSet[0]
+      if rho[i] in rho[i:]:
+         r = rho[i]
+         indexset = [j for j in range(len(rho)) if rho[j]==r]
+         combinepart = []
+         for j in indexset:
+            combinepart += sigma[j]
+         retsigma.append(combinepart)
+         retrho.append(r)
+         iSet = [j for j in iSet if j not in indexset]
+         continue
+      
+      retsigma.append(sigma[i])
+      retrho.append(rho[i])
+
+   #print('so far we have '+str(retsigma)+' and '+str(retrho))
+   #order after induced actions to get consecutive partitions
+   retlistsort = sorted([[retsigma,retrho]],key = lambda x: x[1])
+   
+   #disentangle and reorder again
+   csigma=[]
+   crho = []
+   for x in retlistsort:
+      csigma.append(x[0])
+      crho.append(x[1])
+   
+   if len(eq)==3:	#if info about choice function
+      return((csigma,crho,eq[2]))      
+   return((csigma,crho))
+
+#routine to find reduce equilibria and remove duplicates
+
+def equalpartition(part1,part2):
+   for x in part1:
+      if x not in part2:
+         return(False)
+   for x in part2:
+      if x not in part1:
+         return(False)
+   return(True)
+
+#duplicate eq; gives back whether two equilibria (partition and action profile) coincide or not
+#the routine assumes an ordered action profile
+def duplicate (eq1,eq2):
+   sigma1,rho1 = eq1[0],eq1[1]
+   sigma2,rho2 = eq2[0],eq2[1]
+   
+   length = len(rho1)
+   
+   if rho1 != rho2:
+      return(False)
+      
+   for i in range(length):
+      if not equalpartition(sigma1[i],sigma2[i]):
+         return(False)
+   return(True)
+
+#clean equilibrium list by reducing it and removing duplicates
+def cleanup (eqlis):
+   redlis = list(map(lambda x: reduceeq(x), eqlis))
+   #print('everything reduced')
+   
+   firsteq = redlis[0]
+   returnlis = [firsteq]
+   redlis = list(filter(lambda x: not duplicate(firsteq,x), redlis))
+   
+   while len(redlis) != 0:
+      nexteq = redlis[0]
+      returnlis.append(nexteq)
+      redlis = list(filter(lambda x: not duplicate(nexteq,x), redlis))
+      #print('The reduced list still has '+str(len(redlis))+' elements.')
+   
+   return(returnlis)
+
 ##
 
 
@@ -245,5 +333,17 @@ def findeq(Mlis,h,b,type):
    
    return(eqlis)
 ###
+
+##equilibrium filter
+
+def nonbabbling(eqlis):
+   if len(eqlis[0])==3:
+      print('The MLEU equilibrium contains the following non-babbling ones:')
+
+   if len(eqlis[0])==2:
+      print('The MEU equilibrium contains the following non-babbling ones:')
+   
+   return(list(filter(lambda x: len(x[1])!=1, eqlis)))
+
 
 
