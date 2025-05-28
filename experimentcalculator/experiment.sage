@@ -3,7 +3,7 @@ reset()
 ##sage-file for the equilibrium calculation within the experiment
 
 #state space = number of red balls in unknown urn
-Omega = [1,..,9]
+Omega = [0,..,10]
 
 #distribution (uniform)
 P = [1/len(Omega) for x in Omega]
@@ -26,24 +26,25 @@ def M(h):
          Mlis.append((ipos,ineg))
    return(Mlis)
 
+Mlistest = [(a,b) for a in [0..3] for b in [0..3] if a+b<=3]
 
 ###utility
 ##
 
 #payoff vector, filled up with zeros afterwards
-payoffs = [1300,1000,700,400,100]
-while len(payoffs)<len(Omega)+10:
+payoffs = [1300,900,300,0]#[1300,1000,700,400,100]#[1300,1000,600,100]#[1300,1000,700,400,100]
+while len(payoffs)<2*len(Omega):
    payoffs.append(0)
 
 
-#payoffmaximizer out of [1..9] given (thought) relevant numbers of observed red and black balls
+#payoffmaximizer out of Omega given (thought) relevant numbers of observed red and black balls
 def payoffmaximizer (relevanttuple):
    relred,relblack = relevanttuple	
    denom = sum([ P[ix] * (Omega[ix])^relred * (10-Omega[ix])^relblack for ix in range(len(Omega))])
    Pnew = [P[ix] * (Omega[ix])^relred * ((10-Omega[ix]))^relblack / denom for ix in range(len(Omega))]
    
    #payoffcheckloop
-   baseutil = 0
+   baseutil = -10
    baseguess = Omega[0]
    for x in Omega:		#the 'test candidate' given the choice set to choose from
       
@@ -53,7 +54,7 @@ def payoffmaximizer (relevanttuple):
          util += Pnew[iy] * payoffs[abs(x-y)]
       
       if util == baseutil:
-         print('')#print('same utilitylevel occured')
+         print('same utilitylevel occured for action '+str(x))
       
       if util > baseutil:
          baseutil = util
@@ -69,7 +70,15 @@ def expectedpayoff (m,a,b):
    util = sum([Pnew[i] * payoffs[abs(Omega[i]+b-a)] for i in range(len(Omega))])
    
    return(util)
+
+def smoothpayoff (m,a,b):
+   relred,relblack = m
+   denom = sum([ P[ix] * (Omega[ix])^relred * (10-Omega[ix])^relblack for ix in range(len(Omega))])
+   Pnew = [P[ix] * (Omega[ix])^relred * ((10-Omega[ix]))^relblack / denom for ix in range(len(Omega))]
    
+   util = sum([Pnew[i] * (13-3*abs(Omega[i]+b-a)) * heaviside(4-abs(Omega[i]+b-a)) for i in range(len(Omega))]) #shift by 1?
+   
+   return(util)
 
 def expectednumber (m):
    relred,relblack = m
