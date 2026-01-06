@@ -221,7 +221,10 @@ def tiebreakerlist (h,M):
    
 
 #define action with highest fit in a list of models under a history h, with ties broken according to a complete list tie
-def aMLEU (mlis,h,tie):
+def aMLEU (mlis,h,tie=None):
+   if tie == None:
+      tie = tiebreakerlist(h,M)[0]
+      print('No tie-breaker specified. Using '+str(tie)+'.')
    sortmlis = sorted([(m,expectedfit(m,h)) for m in mlis],key = lambda mf: mf[1])
    topmlis = list(filter(lambda x: x[1] == sortmlis[0][1], sortmlis))
    testmlis = [mf[0] for mf in topmlis]
@@ -237,8 +240,8 @@ def aMLEU (mlis,h,tie):
 def genMall (h):
    if K != len(h):
       raise Exception('Length of history ('+str(len(h))+') incompatible with expected one ('+str(K)+').')
-   h0 = len([hi for hi in h if hi==0])
-   h1 = K-h0
+   h1 = len([hi for hi in h if hi==0])
+   h0 = K-h1
    
    M = []
    for n0 in [0..h0]:
