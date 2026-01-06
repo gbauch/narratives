@@ -1,6 +1,22 @@
 reset()
+from itertools import groupby, permutations, product
+from operator import itemgetter
+from typing import Any, Iterable, Tuple, List
+
+#notifications - turn True for more info, turn False to suppress
+notval = False
+if not notval:
+   print('Notifications are turned off.')
+   #print('Note that notifications are turned off (wont complain about multiple maximizers). Turn them on by setting notval to True.')
+reduceval = True
+if reduceval:
+   print('Solver applies the reduction lemma to simplify equilibria.')
+   #print('Solver automatically applies the reduction lemma to reduce equilibria with different messages for the same action. To turn this off and find all pure equilibria, set reduceval to False.')
 
 ##sage-file for the equilibrium calculation within the experiment
+
+#number of balls in the urn
+Nballs = 10
 
 #state space = number of red balls in unknown urn
 Omega = [0,..,10]
@@ -11,75 +27,79 @@ P = [1/len(Omega) for x in Omega]
 #number of balls drawn
 K = 3
 
-#set of histories (full description; 1 for red, 0 for black)
-H = [[a,b,c] for a in [0,1] for b in [0,1] for c in [0,1]]
+#set of histories (simplified for sufficient statistic), indicating the number of red balls observed (natural number)
+H = [0,..,K]
 
-#set of models (given h in H): set of indices for the relevant balls
+#set of models (given h in H), a tuple of the numbers of observations 1. in favor, 2. in disfavor of a high number of red balls 
 def M(h):
    if not (h in H):
       raise Exception('not a valid history given')
    Mlis = []
-   hpos = sum(h)
-   
-   for ipos in range(hpos+1):
-      for ineg in range(K-hpos+1):
-         Mlis.append((ipos,ineg))
+   for ipos in range(h+1):
+      for ineg in range(K-h+1):
+            Mlis.append((ipos,ineg))
    return(Mlis)
 
-Mlistest = [(a,b) for a in [0..3] for b in [0..3] if a+b<=3]
 
 ###utility
 ##
 
 #payoff vector, filled up with zeros afterwards
-payoffs = [1300,900,300,0]#[1300,1000,700,400,100]#[1300,1000,600,100]#[1300,1000,700,400,100]
-while len(payoffs)<2*len(Omega):
+payoffs = [1300,1000,700,400,100,0]
+while len(payoffs)<3*len(Omega):
    payoffs.append(0)
 
+def posterior (relred, relblack):
+   denom = sum([ P[ix] * (Omega[ix])^relred * (Nballs-Omega[ix])^relblack for ix in range(len(Omega))])
+   if denom == 0:
+      raise Exception('Probability zero event - denominator equals 0 and posterior update is formally undefined.')
+   Pnew = [P[ix] * (Omega[ix])^relred * ((Nballs-Omega[ix]))^relblack / denom for ix in range(len(Omega))]
+   return(Pnew)
 
-#payoffmaximizer out of Omega given (thought) relevant numbers of observed red and black balls
-def payoffmaximizer (relevanttuple):
-   relred,relblack = relevanttuple	
-   denom = sum([ P[ix] * (Omega[ix])^relred * (10-Omega[ix])^relblack for ix in range(len(Omega))])
-   Pnew = [P[ix] * (Omega[ix])^relred * ((10-Omega[ix]))^relblack / denom for ix in range(len(Omega))]
-   
-   #payoffcheckloop
-   baseutil = -10
-   baseguess = Omega[0]
-   for x in Omega:		#the 'test candidate' given the choice set to choose from
-      
-      util = 0
-      for iy in range(len(Omega)):	#looping through all true possibilities
-         y=Omega[iy]
-         util += Pnew[iy] * payoffs[abs(x-y)]
-      
-      if util == baseutil:
-         print('same utilitylevel occured for action '+str(x))
-      
-      if util > baseutil:
-         baseutil = util
-         baseguess = x
-   return(baseguess)
-
-def expectedpayoff (m,a,b):
+def expectedpayoff (m,a,b=0):#of action a and bias b under model/relevant tuple m
    relred,relblack = m
    
-   denom = sum([ P[ix] * (Omega[ix])^relred * (10-Omega[ix])^relblack for ix in range(len(Omega))])
-   Pnew = [P[ix] * (Omega[ix])^relred * ((10-Omega[ix]))^relblack / denom for ix in range(len(Omega))]
+   #updating the prior to the posterior
+   Pnew = posterior(relred,relblack)
    
    util = sum([Pnew[i] * payoffs[abs(Omega[i]+b-a)] for i in range(len(Omega))])
    
    return(util)
 
-def smoothpayoff (m,a,b):
-   relred,relblack = m
-   denom = sum([ P[ix] * (Omega[ix])^relred * (10-Omega[ix])^relblack for ix in range(len(Omega))])
-   Pnew = [P[ix] * (Omega[ix])^relred * ((10-Omega[ix]))^relblack / denom for ix in range(len(Omega))]
+#payoffmaximizer out of Omega given (the thought) relevant numbers of observed red and black balls, i.e. if receiver believes the narrative of the sender
+def payoffmaximizer (relevanttuple,notifications=False): #model/tuple this is a(m,h,b) in the paper
+   relred,relblack = relevanttuple
    
-   util = sum([Pnew[i] * (13-3*abs(Omega[i]+b-a)) * heaviside(4-abs(Omega[i]+b-a)) for i in range(len(Omega))]) #shift by 1?
+   #updating the prior to the posterior
+   Pnew = posterior(relred,relblack)
    
-   return(util)
+   #payoffcheckloop
+   baseutil = 0
+   baseguess = Omega[0]
+   baseguesslist = [baseguess]
+   for x in Omega:		#the action 'test candidate' given the choice set to choose from
+      
+      #define receiver's utility function (bias b = 0)
+      util = expectedpayoff(relevanttuple,x,0)
+      
+      if util == baseutil:
+         #print('same utilitylevel occured')
+         baseguesslist.append(x)
+      
+      if util > baseutil:
+         baseutil = util
+         baseguess = x
+         baseguesslist = [x]
+   if len(baseguesslist) > 1:
+      if 5 not in baseguesslist:
+         raise Exception('Multiple maximizers found, namely '+str(baseguesslist)+'. Dont know which maximizer to choose, as 5 is not one of them!')
+      baseguess = 5
+      if notifications:
+         print('Note: Multiple maximizers found, namely '+str(baseguesslist)+' As the pooling action 5 is one of them, the program uses this action going forward.')
+   return(baseguess)
+   
 
+#not needed currently
 def expectednumber (m):
    relred,relblack = m
    X = Omega #from older version, as backup
@@ -107,58 +127,14 @@ def expectednumber (m):
    #return(closestint(realnumber))
    return(realnumber) #that's the belief
 
-
-def likelihood(m,h):
-   if m not in M(h):
-      raise Exception('m='+str(m)+' given does not seem to be compatible with the observed data h='+str(h))
-   s = m[0]+m[1]
-   if K < s:
-      raise Exception('narrative is longer than history')
-   k = m[0]
-   
-   like = (1/2)^(K-s) * sum([ (Omega[i]/10)^k * ((10-Omega[i])/10)^(s-k) * P[i] for i in range(len(Omega))])
-   
-   return(like)
-
-##choice function for MLEU equilibria
-#If the likelihood of different models are the same, we impose a choice function to consistently pick models (thus, you can strictly rank models by their likelihood, breaking ties)
-#The following functions take a model space and derives all consistent choice functions; giving them back to the equilibrium search algorithm
-def choicegen(mllow): #generates all consistent choice functions based on ordered lists of models
-   #finish pasting
-   if len(mllow)==0:
-      raise Exception('chocegen was given an empty list of models')
-   if len(mllow)==1:
-      yield mllow 
-      return
-   
-   #add next step
-   val = mllow[0][1]
-   mlis = [m for m in filter(lambda x: x[1]==val,mllow)]
-   #mrest = mllow[len(mlis):]
-   
-   for m in mlis:
-      for mllownew in choicegen(list(filter(lambda x: x[0]!=m[0],mllow))):
-         yield [m]+mllownew
-
-def listchoicefunctions (M,h):
-   #checkMh(M,h)
-   #need to sort this here!
-   ml = sorted([(m, likelihood(m,h)) for m in M],key = lambda tup: -tup[1]) #sort models by decreasing likelihood
-   return(choicegen(ml))
-
-def choicefunction (mlis, cml):		#selects the model m from cmlis according to the model-likelihood list / choice function ml
-   for x in cml:
-      if x[0] in mlis:
-         return(x[0])
 ##
-
-###auxiliary set functions
+###auxiliary set functions (before equilibrium)
 ##
 
 
-#takes the ordered set A = {a_1, a_2, ...} = {1,2,...} and gives back all monotone partitions, e.g. {0,1}, {2}, {3,4,...N-1}; by the monotonicity property of the reduction lemma, we use these as indexes (range(...)) for the sorted reduced list M of models
+#takes the ordered set A = {a_1, a_2, ...} = {1,2,...} and gives back all monotone partitions, e.g., {0,1}, {2}, {3,4,...N-1}; by the monotonicity property of the reduction lemma, we use these as indexes (range(...)) for the sorted reduced list M of models
 def monotonepartition (A):
-   if len(A) ==0:
+   if len(A) == 0:
       raise Exception('Empty set given')
    if len(A) == 1:
        yield [ A ]
@@ -172,187 +148,206 @@ def monotonepartition (A):
 
 def orderM(Mlis):
    return(sorted(Mlis,key = lambda m: payoffmaximizer(m)))
-
-
-#determines the corresponding reduced equilibrium
-def reduceeq(eq):
-   sigma=eq[0]
-   rho = eq[1]
-   retsigma = []
-   retrho = []
-   iSet = list(range(len(rho)))
-   while len(iSet)!=0:
-      i = iSet[0]
-      if rho[i] in rho[i:]:
-         r = rho[i]
-         indexset = [j for j in range(len(rho)) if rho[j]==r]
-         combinepart = []
-         for j in indexset:
-            combinepart += sigma[j]
-         retsigma.append(combinepart)
-         retrho.append(r)
-         iSet = [j for j in iSet if j not in indexset]
-         continue
-      
-      retsigma.append(sigma[i])
-      retrho.append(rho[i])
-
-   #print('so far we have '+str(retsigma)+' and '+str(retrho))
-   #order after induced actions to get consecutive partitions
-   retlistsort = sorted([[retsigma,retrho]],key = lambda x: x[1])
-   
-   #disentangle and reorder again
-   csigma=[]
-   crho = []
-   for x in retlistsort:
-      csigma.append(x[0])
-      crho.append(x[1])
-   
-   if len(eq)==3:	#if info about choice function
-      return((csigma,crho,eq[2]))      
-   return((csigma,crho))
-
-#routine to find reduce equilibria and remove duplicates
-
-def equalpartition(part1,part2):
-   for x in part1:
-      if x not in part2:
-         return(False)
-   for x in part2:
-      if x not in part1:
-         return(False)
-   return(True)
-
-#duplicate eq; gives back whether two equilibria (partition and action profile) coincide or not
-#the routine assumes an ordered action profile
-def duplicate (eq1,eq2):
-   sigma1,rho1 = eq1[0],eq1[1]
-   sigma2,rho2 = eq2[0],eq2[1]
-   
-   length = len(rho1)
-   
-   if rho1 != rho2:
-      return(False)
-      
-   for i in range(length):
-      if not equalpartition(sigma1[i],sigma2[i]):
-         return(False)
-   return(True)
-
-#clean equilibrium list by reducing it and removing duplicates
-def cleanup (eqlis):
-   redlis = list(map(lambda x: reduceeq(x), eqlis))
-   #print('everything reduced')
-   
-   firsteq = redlis[0]
-   returnlis = [firsteq]
-   redlis = list(filter(lambda x: not duplicate(firsteq,x), redlis))
-   
-   while len(redlis) != 0:
-      nexteq = redlis[0]
-      returnlis.append(nexteq)
-      redlis = list(filter(lambda x: not duplicate(nexteq,x), redlis))
-      #print('The reduced list still has '+str(len(redlis))+' elements.')
-   
-   return(returnlis)
-
 ##
 
 
 ###
 #ambiguity rules - deriving optimal actions from subsets
 ##
-def aMEU (mlis,h):
+
+#
+#MEU rule
+#note that the history does not enter the function body, as the receiver does only worry about the worst-case model faced. Only implicitly, the history enters by ordering the models potentially differently.
+def aMEU (mlis,h,notifications=False):
    atest = Omega[0]
+   atestlis = [atest]
    valtest = min_symbolic([expectedpayoff(m,atest,0) for m in mlis])
    for a in Omega[1:]:
       valcomp = min_symbolic([expectedpayoff(m,a,0) for m in mlis])
+      
+      if valcomp == valtest:
+         atestlis.append(a)
+      
       if valcomp > valtest:
          atest = a
+         atestlis = [atest]
          valtest = valcomp
+   if notifications and len(atestlis) > 1:
+      print('Multiple maximizers encountered, namely '+str(atestlis)+'. The program continues with '+str(atest)+'.')
    return(atest)
       
-
-def aMLEU (mlis,h,cml):#note, have cml choice list here!
-   if len(mlis) == 0:
-      raise Exception('Empty narrative list given!')   
-   
-   likelisall = [(m, likelihood(m,h)) for m in mlis]
-   valis = [tup[1] for tup in likelisall]
-   #print(likelisall)
-   val = valis[0]
-   for v in valis:
-      if v > val:
-         val = v
-   
-   likelis = [el[0] for el in likelisall if el[1] == val]#list(filter(lambda x: x[1]==val,likelisall))
-   
-   #print('likelis is '+str(likelis))
-   #print('cml is '+str(cml))
-   #print('cfunction is '+str(choicefunction(likelis, cml)))
-   ##tie-breaking rule (need to include b for sender preferred) - for now just take first element
-   ret = payoffmaximizer(choicefunction(likelis, cml))
-
-   return(ret)
 ##
+#MLEU
+#
+
+#define expected fit
+#calculates the expected fit, i.e. the expected likelihood of observing h under narrative m
+def expectedfit(m,h):
+   s = m[0]+m[1] #number of relevant observations
+   if K < s:
+      raise Exception('narrative is longer than history')
+   for elh in h:
+      if elh not in [0,1]:
+         raise Exception('history not consisting of 0s and 1s')
+   k = m[1] #number of observations in favor of a high number
+   
+   fit = (1/2)^(K-s) * sum([ P[i] * (Omega[i]/len(Omega))^k * ((len(Omega)-Omega[i])/len(Omega))^(s-k)  for i in range(len(Omega))])   
+   return(fit)
+
+##
+#Tiebreaker for MLEU
+##
+
+#takes a sorted(!) list (of (m, fit/value)) and iterates further for ties
+
+def auxtie(pairs):
+    pairs_sorted = sorted(pairs, key=itemgetter(1), reverse=True)
+
+    groups = [list(g) for _, g in groupby(pairs_sorted, key=itemgetter(1))]
+
+    group_perms = [list(permutations(g)) for g in groups]
+
+    out = []
+    for combo in product(*group_perms):
+        out.append([item for group in combo for item in group])
+    return out
+
+   
+#generate all tie-breakers
+def tiebreakerlist (h,M):
+   fitM = [(m,expectedfit(m,h)) for m in M]
+   return(auxtie(fitM))
+   #sortfitM = sorted(fitM,key = lambda mf: mf[1])
+   
+
+#define action with highest fit in a list of models under a history h, with ties broken according to a complete list tie
+def aMLEU (mlis,h,tie):
+   sortmlis = sorted([(m,expectedfit(m,h)) for m in mlis],key = lambda mf: mf[1])
+   topmlis = list(filter(lambda x: x[1] == sortmlis[0][1], sortmlis))
+   testmlis = [mf[0] for mf in topmlis]
+   for m,fit in tie:
+      if m in testmlis :
+         return(payoffmaximizer(m))
+   raise Exception('Unexpectedly, the model is not part of the tie-breaking rule!')
+##
+
+###
+##generate set M of models considered (generically, this are all possible models), given a history (by means of the simplifying sufficient statistic)
+###
+def genMall (h):
+   if K != len(h):
+      raise Exception('Length of history ('+str(len(h))+') incompatible with expected one ('+str(K)+').')
+   h0 = len([hi for hi in h if hi==0])
+   h1 = K-h0
+   
+   M = []
+   for n0 in [0..h0]:
+      for n1 in [0..h1]:
+         M.append((n0,n1)) 
+   return(M)
+
+def genMallnonempty (h): #generates all tuples of amounts of 0s and 1s that can be sent excluding the empty model
+   return(list(filter(lambda x: x != (0,0), genMall(h))))
 
 
 ###eqcheck
 ##
-def eqcheck (sigma,rho,b):
+#sigma = communication strategy = a partition of the set of models, rho = action taken in response to a partition by sigma, b = bias
+
+#NOTE: the following function assumes that rho has already been constructed as the best reply of the receiver against sigma given an ambiguity rule, as is done in the equilibrium finder
+def eqcheckinfinder (sigma,rho,b):
    for mlisi in range(len(sigma)):
       for m in sigma[mlisi]:
          maxEU = max_symbolic([expectedpayoff(m,rhoel,b) for rhoel in rho])
          if expectedpayoff(m,rho[mlisi],b) < maxEU:
             return(False)
    return(True)
-#print('cannot have this -> must consider expected payoff')
-##
 
+#apply reduction lemma to reduce equilibria that induce the same action for different messages
+def reduceeq(eq):
+   sigma,rho = eq
+from typing import Any, Iterable, Tuple, List
 
+def reduceeq(
+    eq: Tuple[List[Any], List[float]]
+) -> Tuple[List[Any], List[float]]:
+    
+    sigma, rho = eq
+    if len(sigma) != len(rho):
+        raise ValueError("Both lists must have the same length.")
+
+    acc = {}  # key: y-value, value: accumulated x
+    for x, y in zip(sigma, rho):
+        if y in acc:
+            acc[y] = acc[y] + x
+        else:
+            acc[y] = x
+
+    # dict preserves insertion order in Python 3.7+
+    rho_reduced = list(acc.keys())
+    sigma_reduced = list(acc.values())
+    return sigma_reduced, rho_reduced
+
+###
+#remove equilibrium duplicates
+def _freeze(eq):
+    """Recursively convert lists (and tuples) into tuples so the result is hashable."""
+    if isinstance(eq, list):
+        return tuple(_freeze(x) for x in eq)
+    if isinstance(eq, tuple):
+        return tuple(_freeze(x) for x in eq)
+    return eq
+
+def remove_duplicates(eqlis):
+    seen = set()
+    out = []
+    for eq in eqlis:
+        key = _freeze(eq)
+        if key not in seen:
+            seen.add(key)
+            out.append(eq)
+    return out   
+   
 ###
 #equilibrium finder
 ##
-
-def findeq(Mlis,h,b,type):
+def findeq(Mlis,h,b,type,reduceequilibria = reduceval):
    if type not in ['MLEU','MEU']:
-      raise Exception('Equilibrium type' + str(type) + ' not defined.')
+      raise Exception('Equilibrium type ' + str(type) + ' you have given is undefined. Valid options are currently: MLEU, MEU.')
    
+   ## MEU routine
    if type == 'MEU':
-     ambrule = aMEU
-   if type == 'MLEU':
       ambrule = aMEU
    
-   eqlis = []
-   for sigma in monotonepartition(orderM(Mlis)):
-      
-      if type=='MEU':
+      eqlis = []
+      for sigma in monotonepartition(orderM(Mlis)):
          rho = [ambrule(mpart,h) for mpart in sigma]
-         if eqcheck(sigma,rho,b):
+         if eqcheckinfinder(sigma,rho,b):
+            if reduceequilibria:
+               sigma,rho = reduceeq((sigma,rho))
             eqlis.append((sigma,rho))
-      
-      
-      if type=='MLEU':
-         #define choice function
-         lchoice = list(listchoicefunctions (Mlis,h))
-         for cml in lchoice:
-            rho = [aMLEU(mlis, h, cml) for mlis in sigma]
-            if eqcheck(sigma,rho,b):
-               eqlis.append((sigma,rho,'choice list: '+str(cml)))
+      #remove duplicates
+      eqlis = remove_duplicates(eqlis)
    
+   ## MLEU routine
+   if type == 'MLEU':
+      ambrule = aMLEU
+      
+      #initialize and iterate over tie-breaking rules
+      tielis = tiebreakerlist(h,Mlis)
+      eqlis = []
+      for tie in tielis:
+         eqtielis = []
+         print('Equilibria for the tie-breaking rule '+str(tie)+': ')
+         for sigma in monotonepartition(orderM(Mlis)):
+            rho = [ambrule(mpart,h,tie) for mpart in sigma]
+            if eqcheckinfinder(sigma,rho,b):
+               if reduceequilibria:
+                  sigma,rho = reduceeq((sigma,rho))
+               eqtielis.append((sigma,rho))
+         #remove duplicates
+         eqtielis = remove_duplicates(eqtielis)
+         print(eqtielis)
+         eqlis.append(('Tie: '+str(tie),eqtielis))   
    return(eqlis)
 ###
-
-##equilibrium filter
-
-def nonbabbling(eqlis):
-   if len(eqlis[0])==3:
-      print('The MLEU equilibrium contains the following non-babbling ones:')
-
-   if len(eqlis[0])==2:
-      print('The MEU equilibrium contains the following non-babbling ones:')
-   
-   return(list(filter(lambda x: len(x[1])!=1, eqlis)))
-
-
-
