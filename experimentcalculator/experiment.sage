@@ -1,4 +1,8 @@
 reset()
+
+#packages and tools loaded
+import csv
+from pathlib import Path
 from itertools import groupby, permutations, product
 from operator import itemgetter
 from typing import Any, Iterable, Tuple, List
@@ -21,7 +25,7 @@ Nballs = 10
 #state space = number of red balls in unknown urn
 Omega = [0,..,10]
 
-#distribution (uniform)
+#distribution (uniform)import csv
 P = [1/len(Omega) for x in Omega]
 
 #number of balls drawn
@@ -354,3 +358,50 @@ def findeq(Mlis,h,b,type,reduceequilibria = reduceval):
          eqlis.append(('Tie: '+str(tie),eqtielis))   
    return(eqlis)
 ###
+
+
+
+##write results in file
+def write_equ(type,csv_path=None):
+    """
+    Evaluate foo(x, y) for all pairs (x, y) from xs and ys and write results to a CSV.
+
+    Parameters
+    ----------
+    foo : callable
+        Function with signature foo(x, y).
+    xs, ys : list
+        Lists providing values for the first and second argument.
+    csv_path : str | pathlib.Path
+        Output CSV file path.
+    header : tuple[str, str, str]
+        Column names written as first row.
+    """
+    if type not in ['MEU','MLEU']:
+       raise Exception('Type not of the form MEU or MLEU.')
+    
+    header=("h", "b", type)
+    
+    #initialize hlis: could be made a lot simpler/compact:
+    hlis = []
+    for i in range(K+1):
+       h=[]
+       for j in range(i):
+          h.append(1)
+       while len(h) <K:
+          h.append(0)
+       hlis.append(h)
+    print(hlis)
+    blis=[0,1,3]
+    
+    if csv_path is None:
+        csv_path = Path.home() / "data.csv"   # z.B. /home/user/data.csv oder C:\Users\...\data.csv
+    
+    with open(csv_path, "w", newline="", encoding="utf-8") as f:
+        w = csv.writer(f)
+        if header:
+            w.writerow(header)
+
+        for h in hlis:
+            for b in blis:
+                w.writerow([h, b, findeq(genMall(h),h,b,type)])
