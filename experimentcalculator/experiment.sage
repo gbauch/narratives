@@ -254,13 +254,13 @@ def tiebreakerlist (h,M):
 #define action with highest fit in a list of models under a history h, with ties broken according to a complete list tie
 def aMLEU (mlis,h,tie=None):
    if tie == None:
-      tie = tiebreakerlist(h,M)[0]
+      tie = tiebreakerlist(h,mlis)[0]
       print('No tie-breaker specified. Using '+str(tie)+'.')
-   sortmlis = sorted([(m,expectedfit(m,h)) for m in mlis],key = lambda mf: mf[1])
+   sortmlis = sorted([(m,expectedfit(m,h)) for m in mlis],key = lambda mf: -mf[1])
    topmlis = list(filter(lambda x: x[1] == sortmlis[0][1], sortmlis))
    testmlis = [mf[0] for mf in topmlis]
    for m,fit in tie:
-      if m in testmlis :
+      if m in testmlis:
          return(payoffmaximizer(m))
    raise Exception('Unexpectedly, the model is not part of the tie-breaking rule!')
 ##
