@@ -45,6 +45,24 @@ def M(h):
    return(Mlis)
 
 
+##closest to 5 finder
+def closest25(lis):
+   for el in lis:
+      if el not in Omega:
+         raise Exception('List '+str(lis)+'not a subset of '+str(Omega))
+   baseaction = lis[0]
+   baselis = [baseaction]
+   for el in lis[1:]:
+      if abs(5-el)<abs(5-baseaction):
+         baseaction = el
+         baselis = [baseaction]
+         continue
+      if abs(5-el)==abs(5-baseaction):
+         baselis.append(el)
+   if len(baselis) > 1:
+      print('Multiple maximizers equally close to 5 found, namely '+str(baselis)+'. Program has chosen '+str(baseaction)+'.')
+   return(baseaction)
+
 ###utility
 ##
 
@@ -78,10 +96,10 @@ def payoffmaximizer (relevanttuple,notifications=False): #model/tuple this is a(
    Pnew = posterior(relred,relblack)
    
    #payoffcheckloop
-   baseutil = 0
    baseguess = Omega[0]
    baseguesslist = [baseguess]
-   for x in Omega:		#the action 'test candidate' given the choice set to choose from
+   baseutil = expectedpayoff(relevanttuple,baseguess,0)
+   for x in Omega[1:]:		#the action 'test candidate' given the choice set to choose from
       
       #define receiver's utility function (bias b = 0)
       util = expectedpayoff(relevanttuple,x,0)
@@ -89,17 +107,22 @@ def payoffmaximizer (relevanttuple,notifications=False): #model/tuple this is a(
       if util == baseutil:
          #print('same utilitylevel occured')
          baseguesslist.append(x)
+         continue
       
       if util > baseutil:
          baseutil = util
          baseguess = x
          baseguesslist = [x]
-   if len(baseguesslist) > 1:
-      if 5 not in baseguesslist:
-         raise Exception('Multiple maximizers found, namely '+str(baseguesslist)+'. Dont know which maximizer to choose, as 5 is not one of them!')
-      baseguess = 5
-      if notifications:
-         print('Note: Multiple maximizers found, namely '+str(baseguesslist)+' As the pooling action 5 is one of them, the program uses this action going forward.')
+   ##deactivated as we now have closest25
+   #if len(baseguesslist) > 1:
+   #   if 5 not in baseguesslist:
+   #      raise Exception('Multiple maximizers found, namely '+str(baseguesslist)+'. Dont know which maximizer to choose, as 5 is not one of them!')
+   #   baseguess = 5
+   #   if notifications:
+   #      print('Note: Multiple maximizers found, namely '+str(baseguesslist)+' As the pooling action 5 is one of them, the program uses this action going forward.')
+   
+   baseguess = closest25(baseguesslist)
+   
    return(baseguess)
    
 
@@ -171,13 +194,17 @@ def aMEU (mlis,h,notifications=False):
       
       if valcomp == valtest:
          atestlis.append(a)
+         continue
       
       if valcomp > valtest:
          atest = a
          atestlis = [atest]
          valtest = valcomp
-   if notifications and len(atestlis) > 1:
-      print('Multiple maximizers encountered, namely '+str(atestlis)+'. The program continues with '+str(atest)+'.')
+   #if notifications and len(atestlis) > 1:
+   #   print('Multiple maximizers encountered, namely '+str(atestlis)+'. The program continues with '+str(atest)+'.')
+   
+   atest = closest25(atestlis)
+   
    return(atest)
       
 ##
@@ -195,7 +222,7 @@ def expectedfit(m,h):
          raise Exception('history not consisting of 0s and 1s')
    k = m[1] #number of observations in favor of a high number
    
-   fit = (1/2)^(K-s) * sum([ P[i] * (Omega[i]/len(Omega))^k * ((len(Omega)-Omega[i])/len(Omega))^(s-k)  for i in range(len(Omega))])   
+   fit = (1/2)^(K-s) * sum([ P[i] * (Omega[i]/(len(Omega)-1))^k * ((len(Omega)-1-Omega[i])/(len(Omega)-1))^(s-k)  for i in range(len(Omega))])   
    return(fit)
 
 ##
