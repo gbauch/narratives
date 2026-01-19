@@ -252,7 +252,7 @@ def tiebreakerlist (h,M):
       ts = [tw[0] for tw in L]  # drop weights
       w = [tw[1] for tw in L]
       acts = [abs(payoffmaximizer(t, notifications=False)-5) for t in ts]
-      return all(w[i] > w[i+1] or (acts[i] >= acts[i+1] and w[i] == w[i+1]) for i in range(len(acts) - 1))
+      return all(w[i] > w[i+1] or (acts[i] <= acts[i+1] and w[i] == w[i+1]) for i in range(len(acts) - 1))
 
    return [L for L in LL if filter_tie_breakers_by_distance_to_center(L)]
    
