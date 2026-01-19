@@ -247,8 +247,14 @@ def auxtie(pairs):
 #generate all tie-breakers
 def tiebreakerlist (h,M):
    fitM = [(m,expectedfit(m,h)) for m in M]
-   return(auxtie(fitM))
-   #sortfitM = sorted(fitM,key = lambda mf: mf[1])
+   LL = auxtie(fitM)  
+   def filter_tie_breakers_by_distance_to_center(L):
+      ts = [tw[0] for tw in L]  # drop weights
+      w = [tw[1] for tw in L]
+      acts = [abs(payoffmaximizer(t, notifications=False)-5) for t in ts]
+      return all(w[i] > w[i+1] or (acts[i] >= acts[i+1] and w[i] == w[i+1]) for i in range(len(acts) - 1))
+
+   return [L for L in LL if filter_tie_breakers_by_distance_to_center(L)]
    
 
 #define action with highest fit in a list of models under a history h, with ties broken according to a complete list tie
