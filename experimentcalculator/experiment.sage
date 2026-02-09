@@ -3,12 +3,16 @@ reset()
 #packages and tools loaded
 import csv
 from pathlib import Path
-from itertools import groupby, permutations, product
+from itertools import groupby, permutations, product, cycle
 from operator import itemgetter
 from typing import Any, Iterable, Tuple, List
+from sage.plot.colors import rainbow
+
+#color palette
+palette = cycle(rainbow(20))
 
 #notifications - turn True for more info, turn False to suppress
-notval = False
+notval = True
 if not notval:
    print('Notifications are turned off.')
    #print('Note that notifications are turned off (wont complain about multiple maximizers). Turn them on by setting notval to True.')
@@ -306,7 +310,6 @@ def eqcheckinfinder (sigma,rho,b):
 #apply reduction lemma to reduce equilibria that induce the same action for different messages
 def reduceeq(eq):
    sigma,rho = eq
-from typing import Any, Iterable, Tuple, List
 
 def reduceeq(
     eq: Tuple[List[Any], List[float]]
@@ -391,6 +394,23 @@ def findeq(Mlis,h,b,type,reduceequilibria = reduceval):
          eqlis.append(('Tie: '+str(tie),eqtielis))   
    return(eqlis)
 ###
+
+###
+#Manuel wanted to know why in the MEU equilibrium [[(0, 2)], [(0, 1), (1, 2), (0, 0), (1, 1)], [(1, 0)]], [1, 5, 8] there is a 5 as optimal action. Here comes a plot to illustrate that it depends on the expected utilities.
+
+def testplotMEU(mlis,h):
+   print('Action recommended by the program is aMEU = '+str(aMEU(mlis,h)))
+   
+   #prepare the graphic
+   
+   m0 = mlis[0]
+   P = line([(a,expectedpayoff(m0,a)) for a in Omega],color=next(palette),legend_label=f""+str(m0))
+   
+   for m in mlis[1:]:
+      P += line([(a,expectedpayoff(m,a)) for a in Omega],color=next(palette),legend_label=f""+str(m))
+   
+   return(show(P))
+   
 
 
 
